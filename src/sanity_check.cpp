@@ -6,7 +6,6 @@
  *   time, the rover will be set to standby mode.
  * 
  *   Author: Andrew Stuart
- *   Last modified by: Andrew Stuart (24/04/2018)
  *****************************************************************************************/
 
 // ROS and standard file includes
@@ -25,12 +24,12 @@ using namespace std;
 
 
 #define LOOP_HERTZ                  1
-#define MAINFRAME_HERTZ             10
-#define VOLTAGES_HERTZ              50
-#define RPM_HERTZ                   50
-#define MAX_TIME_WITHOUT_HBEAT      5
+#define MAINFRAME_HERTZ             1
+#define VOLTAGES_HERTZ              1
+#define RPM_HERTZ                   1
+#define MAX_TIME_WITHOUT_HBEAT      3
 #define MAX_TIME_WITH_LOW_VOLTAGE   5
-#define MAX_TIME_WITH_RPM_EXCEEDING 5
+#define MAX_TIME_WITH_RPM_EXCEEDING 300
 #define NUM_OF_BATTERIES            4
 
 // Threshold values
@@ -79,7 +78,7 @@ void Set_Mode_To_Standby()
  * misbehaving. 
  ****************************************************************************/
 {
-    n->setParam("STATE", "STANDBY");
+    n->setParam("/STATE", "STANDBY");
 }
 
 void Print_Voltage_Error()
@@ -207,10 +206,10 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "sanity_check");
     n = new ros::NodeHandle("~");
     ros::Rate loop_rate(LOOP_HERTZ);
-    ros::Subscriber encoders_sub = n->subscribe("encoders", 5, encoders_cb);
-    ros::Subscriber hbeat_sub = n->subscribe("hbeat", 1, hbeat_cb);
-    ros::Subscriber voltage_sub = n->subscribe("voltage", 1, voltage_cb);
-    ros::Subscriber reqRPM_sub = n->subscribe("req_rpm", 4, reqRPM_cb);
+    ros::Subscriber encoders_sub = n->subscribe("/encoders", 5, encoders_cb);
+    ros::Subscriber hbeat_sub = n->subscribe("/hbeat", 1, hbeat_cb);
+    ros::Subscriber voltage_sub = n->subscribe("/voltage", 1, voltage_cb);
+    ros::Subscriber reqRPM_sub = n->subscribe("/req_rpm", 4, reqRPM_cb);
     ros::Duration(5).sleep(); // Give sensors time to get values
 
     while(ros::ok())
