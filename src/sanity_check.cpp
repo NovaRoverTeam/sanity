@@ -21,6 +21,8 @@ using namespace std;
 #include <rover/RPM.h>
 #include <rover/ReqRPM.h>
 #include <rover/Voltages.h>
+#include <gps/Gps.h>
+#include <autopilot/calc_route.h>
 
 
 #define LOOP_HERTZ                  1
@@ -31,18 +33,25 @@ using namespace std;
 #define MAX_TIME_WITH_LOW_VOLTAGE   5
 #define MAX_TIME_WITH_RPM_EXCEEDING 300
 #define NUM_OF_BATTERIES            4
+#define RTB_TIME                    20 // Time until return to base
 
 // Threshold values
 #define RPM_DIFFERENCE_THRESHOLD    10
 #define MIN_VOLTAGE_THRESHOLD       10.0
 
+// Home position (MDRS)
+#define MDRS_LAT    38.406447
+#define MDRS_LONG -110.791943
+
 // NodeHandle must be global
 ros::NodeHandle* n;
+ros::ServiceClient start_auto_client;
 
 // Maximum time constant calculations
-const int HBEAT_TIMEOUT         =   MAX_TIME_WITHOUT_HBEAT * MAINFRAME_HERTZ;
-const int VOLTAGES_TIMEOUT      =   MAX_TIME_WITH_LOW_VOLTAGE * VOLTAGES_HERTZ;
-const int RPM_TIMEOUT           =   MAX_TIME_WITH_RPM_EXCEEDING * RPM_HERTZ;
+const int HBEAT_TIMEOUT    = MAX_TIME_WITHOUT_HBEAT * MAINFRAME_HERTZ;
+const int VOLTAGES_TIMEOUT = MAX_TIME_WITH_LOW_VOLTAGE * VOLTAGES_HERTZ;
+const int RPM_TIMEOUT      = MAX_TIME_WITH_RPM_EXCEEDING * RPM_HERTZ;
+const int RTB_TIMEOUT      = RTB_TIME * MAINFRAME_HERTZ;
 
 // The number of batteries must be determined before measuring the sensor voltage
 bool num_of_batteries_found     =   false;
@@ -56,6 +65,9 @@ float voltages[4]               =   {0.0,0.0,0.0,0.0};
 bool batt_is_connected[4]       =   {1,1,1,1};
 int req_rpm[4]                  =   {0,0,0,0};
 int actual_rpm[4]               =   {0,0,0,0};
+
+gps::Gps home_coord; // Coordinate of the MDRS
+bool rtb_engaged = false;
 
 // _______________________________FUNCTIONS__________________________________
 bool Num_Outside_Of_Range(int desired_num, int actual_num, int range_difference)
@@ -205,20 +217,49 @@ int main(int argc, char **argv)
     // ROS setup and iinitialisation
     ros::init(argc, argv, "sanity_check");
     n = new ros::NodeHandle("~");
+
     ros::Rate loop_rate(LOOP_HERTZ);
     ros::Subscriber encoders_sub = n->subscribe("/encoders", 5, encoders_cb);
     ros::Subscriber hbeat_sub = n->subscribe("/hbeat", 1, hbeat_cb);
     ros::Subscriber voltage_sub = n->subscribe("/voltage", 1, voltage_cb);
     ros::Subscriber reqRPM_sub = n->subscribe("/req_rpm", 4, reqRPM_cb);
+
+    start_auto_client = 
+      n->serviceClient<autopilot::calc_route>("/Start_Auto");
+      
+    home_coord.latitude =  MDRS_LAT;
+    home_coord.longitude = MDRS_LONG;
+
     ros::Duration(5).sleep(); // Give sensors time to get values
 
     while(ros::ok())
     {
         // Check heartbeat
-        if(hbeat_count > HBEAT_TIMEOUT)
+        if((hbeat_count > HBEAT_TIMEOUT) && (hbeat_count <= RTB_TIMEOUT))
         {
             ROS_ERROR_STREAM("NO HEARTBEAT DETECTED; REVERTING TO STANDBY MODE");
             Set_Mode_To_Standby();
+            
+            rtb_engaged = false;
+        }
+
+        // If no heartbeat for Return To Base amount of time
+        if(hbeat_count > RTB_TIMEOUT)
+        {
+            string mode; n->getParam("/MODE", mode);
+        
+            // If we aren't already Returning to Base and competition mode engaged
+            if (!rtb_engaged && (mode == "COMPETITION")) 
+            {
+                autopilot::calc_route srv;
+                
+                srv.request.latlng = true;
+                srv.request.destination = home_coord;
+                
+                start_auto_client.call(srv); // Engage autonomous mode
+                
+                rtb_engaged = true; // Record that we're engaging Return to Base
+            }	
         }
 
         // Check voltages
@@ -236,7 +277,7 @@ int main(int argc, char **argv)
         }
 
         // Limit counte, 10x is sufficiently high
-        if(hbeat_count < (10*HBEAT_TIMEOUT)) hbeat_count++;
+        if(hbeat_count < (10*RTB_TIMEOUT)) hbeat_count++;
         
         ros::spinOnce();
         loop_rate.sleep();
