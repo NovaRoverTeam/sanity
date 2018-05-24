@@ -234,8 +234,10 @@ int main(int argc, char **argv)
 
     while(ros::ok())
     {
-        // Check heartbeat
-        if((hbeat_count > HBEAT_TIMEOUT) && (hbeat_count <= RTB_TIMEOUT))
+        string state; n->getParam("/STATE", state);
+
+        // Only set to standby if no heartbeat, not returning to base and not in autonomous state
+        if((hbeat_count > HBEAT_TIMEOUT) && (hbeat_count <= RTB_TIMEOUT) && (state != "AUTO"))
         {
             ROS_ERROR_STREAM("NO HEARTBEAT DETECTED; REVERTING TO STANDBY MODE");
             Set_Mode_To_Standby();
@@ -253,6 +255,9 @@ int main(int argc, char **argv)
             {
                 autopilot::calc_route srv;
                 
+                srv.request.disable_lidar = true;
+                srv.request.glen_enabled = false; 
+
                 srv.request.latlng = true;
                 srv.request.destination = home_coord;
                 
