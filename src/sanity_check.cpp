@@ -251,34 +251,38 @@ int main(int argc, char **argv)
             string mode; n->getParam("/MODE", mode);
         
             // If we aren't already Returning to Base and competition mode engaged
-            if (!rtb_engaged && (mode == "COMPETITION")) 
+            if (!rtb_engaged) 
             {
-                autopilot::calc_route srv;
+                if (mode == "COMPETITION")
+                {
+                  autopilot::calc_route srv;
                 
-                srv.request.disable_lidar = true;
-                srv.request.glen_enabled = false; 
+                  srv.request.disable_lidar = true;
+                  srv.request.glen_enabled = false; 
 
-                srv.request.latlng = true;
-                srv.request.destination = home_coord;
+                  srv.request.latlng = true;
+                  srv.request.destination = home_coord;
                 
-                start_auto_client.call(srv); // Engage autonomous mode
+                  start_auto_client.call(srv); // Engage autonomous mode
                 
-                rtb_engaged = true; // Record that we're engaging Return to Base
+                  rtb_engaged = true; // Record that we're engaging Return to Base
+                }
+                else Set_Mode_To_Standby();
             }	
         }
 
         // Check voltages
         if(voltages_count > VOLTAGES_TIMEOUT)
         {
-            Print_Voltage_Error();
-            Set_Mode_To_Standby();
+            //Print_Voltage_Error();
+            //Set_Mode_To_Standby();
         }
 
         // Check RPM
         if(rpm_count > RPM_TIMEOUT)
         {
-            Print_RPM_Error();
-            Set_Mode_To_Standby();
+            //Print_RPM_Error();
+            //Set_Mode_To_Standby();
         }
 
         // Limit counte, 10x is sufficiently high
