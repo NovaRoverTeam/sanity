@@ -255,6 +255,7 @@ int main(int argc, char **argv)
             {
                 if (mode == "COMPETITION")
                 {
+                  ROS_INFO("Heartbeat timeout reached, I'M COMING HOME FAM");
                   autopilot::calc_route srv;
                 
                   srv.request.disable_lidar = true;
